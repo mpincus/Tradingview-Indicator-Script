@@ -1,0 +1,236 @@
+// Based on the TMA Overlay by Arty
+//
+// This is a trimmed down version of the OG TMA Overlay with a focus on highlighting a couple specific candlestick patterns.
+// This script is organized in a way that allows each pattern to be commented-out (disabled) or uncommented (enabled) pretty easily.
+//
+// The original request was for 3-Line-Strike only, so that is what will be enabled/uncommented by default,
+// but the engulfing code will be left in as well so that it can be turned on easily if desired.
+//
+// TODO: Add in a trend filter based on the trend identification method Arty discusses in his video on this candle pattern. 
+//
+// NOTE: As-written, the symbols and 'alert()' functions are subject to repainting (firing without a confirmed signal at bar close).
+//       This was done deliberately as a way to give people early-warning on live charts to help give them time to prepare for an entry,
+//       which can be especially significant when scalping on low timeframe (1-5m) charts.
+//       
+//
+//@version=5
+indicator(title='3 Line Strike [TTF]', shorttitle='3LS [TTF]', overlay=true)
+
+// Inputs
+//
+// ### 3 Line Strike
+bearS = input.bool(title='Show Bearish 3 Line Strike', defval=true, group='3 Line Strike', tooltip="The Bearish 3 Line Strike ( ) is a candlestick pattern comprised of 3 bullish (green) candles, " +
+         "followed by a bearish engulfing candle (see 'Big A$$ Candles' below).\n\n" +
+         "This pattern tends to be best used as a signal of the end of a retracement period as part of a trend continuation strategy.\n\n" +
+         "Default: Checked")
+bullS = input.bool(title='Show Bullish 3 Line Strike', defval=true, group='3 Line Strike', tooltip="The Bullish 3 Line Strike ( ) is a candlestick pattern comprised of 3 bearish (red) candles, " +
+         "followed by a bullish engulfing candle (see 'Big A$$ Candles' below).\n\n" +
+         "This pattern tends to be best used as a signal of the end of a retracement period as part of a trend continuation strategy.\n\n" +
+         "Default: Checked")
+showMemeChars = input.bool(title="Plot 3 Line Strike meme symbols", defval=false, group="3 Line Strike", tooltip="If disabled (default), standard shapes will be plotted instead, which can then be further customized on the 'Styles' tab of the indicator settings.\n\n" +
+         "If enabled, meme icons hand-selected by Arty himself (🍆 and 🍑) will be plotted for 3LS signals instead of the more typical shapes.\n\n" +
+         "Default: Unchecked")
+//
+//### Engulfing Candles
+//
+bearE = input.bool(title='Show Bearish Big A$$ Candles', defval=false, group='Big A$$ Candles', tooltip="Bearish 'Big A$$ Candles' are the same as Bearish Engulfing candles.")
+bullE = input.bool(title='Show Bullish Big A$$ Candles', defval=false, group='Big A$$ Candles', tooltip="Bullish 'Big A$$ Candles' are the same as Bullish Engulfing candles.")
+//
+//### Alerts
+//
+// This won't actually DO anything, just popping it to note the behavior of the "Any alert() function call" alert type
+void = input.bool(title="The new 'Any alert() function call' (dynamic) alerts will be based on what signals are enabled in the indicator settings.", defval=true, tooltip="This does nothing - it's only here to clarify alert functionality.")
+//
+// End Inputs ###
+
+// ### 3 Line Strike
+
+bearSig = close[3] > open[3] and close[2] > open[2] and close[1] > open[1] and close < open[1]
+bullSig = close[3] < open[3] and close[2] < open[2] and close[1] < open[1] and close > open[1]
+
+// Meme plots for the 3LS signal
+plotchar(bullS and showMemeChars ? bullSig : na, char="🍆", color=color.rgb(0, 255, 0, 0), location=location.belowbar, size=size.tiny, text=' ', title='3 Line Strike Up (Meme Icon)', editable=false)
+plotchar(bearS and showMemeChars ? bearSig : na, char="🍑", color=color.rgb(255, 0, 0, 0), location=location.abovebar, size=size.tiny, text=' ', title='3 Line Strike Down (Meme Icon)', editable=false)
+//
+// Standard plots for the 3LS signal
+plotshape(bullS and not showMemeChars ? bullSig : na, style=shape.triangleup, color=color.rgb(0, 255, 0, 0), location=location.belowbar, size=size.small, text=' ', title='3 Line Strike Up')
+plotshape(bearS and not showMemeChars ? bearSig : na, style=shape.triangledown, color=color.rgb(255, 0, 0, 0), location=location.abovebar, size=size.small, text=' ', title='3 Line Strike Down')
+//
+// # Alerts
+//
+// Old-style Alert Conditions
+alertcondition(bullS and barstate.isconfirmed, title='Bullish 3 Line Strike', message='{{exchange}}:{{ticker}} {{interval}} - Bullish 3 Line Strike')
+alertcondition(bearS and barstate.isconfirmed, title='Bearish 3 Line Strike', message='{{exchange}}:{{ticker}} {{interval}} - Bearish 3 Line Strike')
+//
+// New-style alerts
+if (bullS and bullSig and barstate.isconfirmed)
+    m = '{{exchange}}:{{ticker}} {{interval}} - Bullish 3 Line Strike'
+    alert(message=m, freq=alert.freq_once_per_bar)
+if (bearS and bearSig and barstate.isconfirmed)
+    m = '{{exchange}}:{{ticker}} {{interval}} - Bearish 3 Line Strike'
+    alert(message=m, freq=alert.freq_once_per_bar)   
+
+// End ###
+
+//### Engulfing Candles
+
+openBarPrevious = open[1]
+closeBarPrevious = close[1]
+openBarCurrent = open
+closeBarCurrent = close
+
+//If current bar open is less than equal to the previous bar close AND current bar open is less than previous bar open AND current bar close is greater than previous bar open THEN True
+bullishEngulfing = openBarCurrent <= closeBarPrevious and openBarCurrent < openBarPrevious and closeBarCurrent > openBarPrevious
+//If current bar open is greater than equal to previous bar close AND current bar open is greater than previous bar open AND current bar close is less than previous bar open THEN True
+bearishEngulfing = openBarCurrent >= closeBarPrevious and openBarCurrent > openBarPrevious and closeBarCurrent < openBarPrevious
+
+//bullishEngulfing/bearishEngulfing return a value of 1 or 0; if 1 then plot on chart, if 0 then don't plot
+plotshape(bullE ? bullishEngulfing : na, style=shape.triangleup, location=location.belowbar, color=color.rgb(0, 255, 0, 0), size=size.tiny, title='Big A$$ Candle Up')
+plotshape(bearE ? bearishEngulfing : na, style=shape.triangledown, location=location.abovebar, color=color.rgb(255, 0, 0, 0), size=size.tiny, title='Big A$$ Candle Down')
+
+// Alerts
+//
+// Old-style alert conditions...
+alertcondition(bullishEngulfing and barstate.isconfirmed, title='Bullish Engulfing', message='{{exchange}}:{{ticker}} {{interval}} - Bullish candle engulfing previous candle')
+alertcondition(bearishEngulfing and barstate.isconfirmed, title='Bearish Engulfing', message='{{exchange}}:{{ticker}} {{interval}} - Bearish candle engulfing previous candle')
+//
+// New-style alert() functions
+// New-style alerts
+if (bullE and bullishEngulfing and barstate.isconfirmed)
+    m = '{{exchange}}:{{ticker}} {{interval}} - Bullish candle engulfing previous candle'
+    alert(message=m, freq=alert.freq_once_per_bar)
+if (bearE and bearishEngulfing and barstate.isconfirmed)
+    m = '{{exchange}}:{{ticker}} {{interval}} - Bearish candle engulfing previous candle'
+    alert(message=m, freq=alert.freq_once_per_bar)  
+
+// End ###
+
+//@version=5
+//indicator("SSL Channel atr with adx signal", shorttitle="SSL Channel atr with adx signal", overlay=true)
+
+wicks = input(false, "Take Wicks into Account ?")
+highlightState = input(true, "Highlight State ?")
+ma(source, length, type) =>
+    type == "SMA" ? ta.sma(source, length) :
+     type == "EMA" ? ta.ema(source, length) :
+     type == "SMMA (RMA)" ? ta.rma(source, length) :
+     type == "WMA" ? ta.wma(source, length) :
+     type == "VWMA" ? ta.vwma(source, length) :
+     na
+
+show_ma1   = input(true   , "MA High", inline="MA #1", group="Channel №1")
+ma1_type   = input.string("SMA"  , ""     , inline="MA #1", options=["SMA", "EMA", "SMMA (RMA)", "WMA", "VWMA"], group="Channel №1")
+ma1_source = input(high  , ""     , inline="MA #1", group="Channel №1")
+ma1_length = input.int(200     , ""     , inline="MA #1", minval=1, group="Channel №1")
+ma1_color  = input(color.green, ""     , inline="MA #1", group="Channel №1")
+ma1 = ma(ma1_source, ma1_length, ma1_type)
+
+show_ma2   = input(true   , "MA Low", inline="MA #2", group="Channel №1")
+ma2_type   = input.string("SMA"  , ""     , inline="MA #2", options=["SMA", "EMA", "SMMA (RMA)", "WMA", "VWMA"], group="Channel №1")
+ma2_source = input(low  , ""     , inline="MA #2", group="Channel №1")
+ma2_length = input.int(200     , ""     , inline="MA #2", minval=1, group="Channel №1")
+ma2_color  = input(color.red, ""     , inline="MA #2", group="Channel №1")
+ma2 = ma(ma2_source, ma2_length, ma2_type)
+showLabels1 = input(false, "Show Buy/Sell Labels ?", group="Channel №1")
+
+show_ma3   = input(true   , "MA High", inline="MA #3", group="Channel №2")
+ma3_type   = input.string("SMA"  , ""     , inline="MA #3", options=["SMA", "EMA", "SMMA (RMA)", "WMA", "VWMA"], group="Channel №2")
+ma3_source = input(high  , ""     , inline="MA #3", group="Channel №2")
+ma3_length = input.int(20    , ""     , inline="MA #3", minval=1, group="Channel №2")
+ma3_color  = input(color.green, ""     , inline="MA #3", group="Channel №2")
+ma3 = ma(ma3_source, ma3_length, ma3_type)
+
+show_ma4   = input(true  , "MA Low", inline="MA #4", group="Channel №2")
+ma4_type   = input.string("SMA"  , ""     , inline="MA #4", options=["SMA", "EMA", "SMMA (RMA)", "WMA", "VWMA"], group="Channel №2")
+ma4_source = input(low  , ""     , inline="MA #4", group="Channel №2")
+ma4_length = input.int(20    , ""     , inline="MA #4", minval=1, group="Channel №2")
+ma4_color  = input(color.red, ""     , inline="MA #4", group="Channel №2")
+ma4 = ma(ma4_source, ma4_length, ma4_type)
+showLabels2 = input(false, "Show Buy/Sell Labels ?", group="Channel №2")
+
+Hlv1 = float(na)
+Hlv1 := (wicks ? high : close) > ma1 ? 1 : (wicks ? low : close) < ma2 ? -1 : Hlv1[1]
+sslUp1   = Hlv1 < 0 ? ma2 : ma1
+sslDown1 = Hlv1 < 0 ? ma1 : ma2
+
+Color1 = Hlv1 == 1 ? ma1_color : ma2_color
+fillColor1 = highlightState ? (color.new(Color1, 50)) : na
+
+highLine1 = plot(show_ma1 ? sslUp1 : na, title="UP", linewidth=2, color = Color1)
+lowLine1 = plot(show_ma2 ? sslDown1 : na, title="DOWN", linewidth=2, color = Color1)
+
+//plotshape(show_ma1 and showLabels1 and Hlv1 == 1 and Hlv1[1] == -1, title="Buy Label", text="Buy", location=location.belowbar, style=shape.labelup, size=size.tiny, color=Color1, textcolor=color.white)
+//plotshape(show_ma2 and showLabels1 and Hlv1 == -1 and Hlv1[1] == 1, title="Sell Label", text="Sell", location=location.abovebar, style=shape.labeldown, size=size.tiny, color=Color1, textcolor=color.white)
+
+fill(highLine1, lowLine1, color = fillColor1)
+
+Hlv2 = float(na)
+Hlv2 := (wicks ? high : close) > ma3 ? 1 : (wicks ? low : close) < ma4 ? -1 : Hlv2[1]
+sslUp2   = Hlv2 < 0 ? ma4 : ma3
+sslDown2 = Hlv2 < 0 ? ma3 : ma4
+
+Color2 = Hlv2 == 1 ? ma3_color : ma4_color
+fillColor2 = highlightState ? (color.new(Color2, 50)) : na
+
+highLine2 = plot(show_ma3 ? sslUp2 : na, title="UP", linewidth=2, color = Color2)
+lowLine2 = plot(show_ma4 ? sslDown2 : na, title="DOWN", linewidth=2, color = Color2)
+
+//plotshape(show_ma3 and showLabels2 and Hlv2 == 1 and Hlv2[1] == -1, title="Buy Label", text="Buy", location=location.belowbar, style=shape.labelup, size=size.tiny, color=Color2, textcolor=color.white)
+//plotshape(show_ma4 and showLabels2 and Hlv2 == -1 and Hlv2[1] == 1, title="Sell Label", text="Sell", location=location.abovebar, style=shape.labeldown, size=size.tiny, color=Color2, textcolor=color.white)
+
+fill(highLine2, lowLine2, color = fillColor2)
+
+// Alerts
+alertcondition(Hlv1 == 1 and Hlv1[1] == -1, title="SSL Channel (1) Buy Alert", message = "SSL Channel (1): BUY")
+alertcondition(Hlv1 == -1 and Hlv1[1] == 1, title="SSL Channel (1) Sell Alert", message = "SSL Channel (1): SELL")
+alertcondition(Hlv2 == 1 and Hlv2[1] == -1, title="SSL Channel (2) Buy Alert", message = "SSL Channel (2): BUY")
+alertcondition(Hlv2 == -1 and Hlv2[1] == 1, title="SSL Channel (2) Sell Alert", message = "SSL Channel (2): SELL")
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////       ADX     ///////////////////////////////////////////////////////////////////////////////////
+
+//indicator('ADX', overlay=false)
+len = input(14)
+th = input(20)
+
+TrueRange = math.max(math.max(high - low, math.abs(high - nz(close[1]))), math.abs(low - nz(close[1])))
+DirectionalMovementPlus = high - nz(high[1]) > nz(low[1]) - low ? math.max(high - nz(high[1]), 0) : 0
+DirectionalMovementMinus = nz(low[1]) - low > high - nz(high[1]) ? math.max(nz(low[1]) - low, 0) : 0
+
+SmoothedTrueRange = 0.0
+SmoothedTrueRange := nz(SmoothedTrueRange[1]) - nz(SmoothedTrueRange[1]) / len + TrueRange
+
+SmoothedDirectionalMovementPlus = 0.0
+SmoothedDirectionalMovementPlus := nz(SmoothedDirectionalMovementPlus[1]) - nz(SmoothedDirectionalMovementPlus[1]) / len + DirectionalMovementPlus
+
+SmoothedDirectionalMovementMinus = 0.0
+SmoothedDirectionalMovementMinus := nz(SmoothedDirectionalMovementMinus[1]) - nz(SmoothedDirectionalMovementMinus[1]) / len + DirectionalMovementMinus
+
+DIPlus = SmoothedDirectionalMovementPlus / SmoothedTrueRange * 100
+DIMinus = SmoothedDirectionalMovementMinus / SmoothedTrueRange * 100
+DX = math.abs(DIPlus - DIMinus) / (DIPlus + DIMinus) * 100
+ADX = ta.sma(DX, len)
+
+//plot(DIPlus, color=color.new(color.green, 0), title='DI+')
+//plot(DIMinus, color=color.new(color.red, 0), title='DI-')
+//plot(ADX, color=color.new(color.navy, 0), title='ADX')
+//hline(th, color=color.black)
+///////////////////////////////////////////     ADX     ////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+longCondition = open < close - ta.atr(14) and ta.rsi(close,14)>50 and close > ma1 and close > ma3 and ADX > th
+shortCondition = open > ta.atr(14) + close and ta.rsi(close,14)<50 and close < ma2 and close < ma4 and ADX > th
+
+//longStop = longCondition and close < ma1
+//shortStop = shortCondition and close > ma2
+
+plot(ta.sma(close, 1000), color=color.new(color.white,90), linewidth=50)
+
+alertcondition(longCondition or shortCondition, title="scalp signal", message = "scalp signal")
+
+plotshape(shortCondition, title='Sell Label', text='Sell', location=location.abovebar, style=shape.labeldown, size=size.tiny, color=color.new(color.red, 0), textcolor=color.new(color.white, 0))
+plotshape(longCondition, title='Buy Label', text='Buy', location=location.belowbar, style=shape.labelup, size=size.tiny, color=color.new(color.green, 0), textcolor=color.new(color.white, 0))
+
+//plotshape(shortStop, title='Sellstop Label', text='Stop', location=location.abovebar, style=shape.labeldown, size=size.tiny, color=color.new(color.red, 0), textcolor=color.new(color.white, 0))
+//plotshape(longStop, title='Buystop Label', text='Stop', location=location.belowbar, style=shape.labelup, size=size.tiny, color=color.new(color.green, 0), textcolor=color.new(color.white, 0))
+
+    
